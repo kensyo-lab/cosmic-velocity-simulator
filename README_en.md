@@ -129,4 +129,4 @@ MIT License — free to use, modify, and redistribute for any purpose, including
 
 **Kensho**  
 - Niconico: [窮理学 (Kyūrigaku)](https://www.nicovideo.jp/) — Physics & Space science series  
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
+- GitHub: @kensyo-lab
