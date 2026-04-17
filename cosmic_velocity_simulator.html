@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宇宙速度シミュレーター</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0a0c14;
+  color: #ccc;
+  font-family: 'Hiragino Sans', 'Meiryo', sans-serif;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  gap: 10px;
+}
+h1 {
+  font-size: 17px;
+  font-weight: 500;
+  color: #e0e8ff;
+  letter-spacing: 0.05em;
+  align-self: flex-start;
+  width: 100%;
+  max-width: 1100px;
+}
+
+/* メインレイアウト: キャンバス左 + エネルギーパネル右 */
+.main-layout {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  max-width: 1100px;
+  align-items: flex-start;
+}
+#cv-canvas {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  background: #06080f;
+  border-radius: 10px;
+  border: 1px solid #1a2240;
+}
+
+/* エネルギーパネル */
+.energy-panel {
+  flex: 0 0 220px;
+  background: #0d1120;
+  border: 1px solid #1e2844;
+  border-radius: 10px;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ep-title {
+  font-size: 11px;
+  color: #6677aa;
+  letter-spacing: 0.08em;
+  text-align: center;
+  border-bottom: 1px solid #1a2840;
+  padding-bottom: 7px;
+}
+.ep-zero-line {
+  font-size: 10px;
+  color: #778899;
+  text-align: center;
+  background: #111828;
+  border-radius: 4px;
+  padding: 4px 6px;
+  line-height: 1.5;
+}
+.ep-zero-line span { color: #aaccff; font-weight: 500; }
+
+.orbit-card {
+  background: #0a0f1e;
+  border-radius: 7px;
+  border: 1px solid #182030;
+  padding: 8px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.orbit-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+.orbit-dot {
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.orbit-name { font-size: 11px; font-weight: 500; color: #ccd8ee; }
+.orbit-state {
+  margin-left: auto;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.state-bound   { background: #0c2040; color: #5599ff; }
+.state-escape  { background: #201008; color: #ffaa44; }
+.state-impact  { background: #1a0808; color: #ff5555; }
+
+/* エネルギーバー群 */
+.energy-bars { display: flex; flex-direction: column; gap: 4px; }
+.ebar-row { display: flex; align-items: center; gap: 5px; }
+.ebar-label { font-size: 9px; color: #556688; width: 18px; flex-shrink: 0; text-align: right; }
+.ebar-track {
+  flex: 1;
+  height: 8px;
+  background: #0c1428;
+  border-radius: 4px;
+  overflow: visible;
+  position: relative;
+}
+.ebar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.1s, background 0.2s;
+  min-width: 0;
+  position: absolute;
+  top: 0;
+}
+/* ゼロライン */
+.ebar-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(150,180,255,0.25);
+}
+.ebar-num { font-size: 9px; color: #778899; width: 46px; flex-shrink: 0; text-align: right; font-variant-numeric: tabular-nums; }
+
+/* 合計エネルギー表示 */
+.etotal-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border-top: 1px solid #182030;
+  padding-top: 5px;
+  margin-top: 1px;
+}
+.etotal-label { font-size: 9px; color: #556688; width: 18px; flex-shrink: 0; text-align: right; }
+.etotal-bar-wrap { flex: 1; position: relative; height: 10px; }
+.etotal-track {
+  position: absolute;
+  inset: 0;
+  background: #0c1428;
+  border-radius: 5px;
+  overflow: visible;
+}
+.etotal-track::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px; bottom: -3px;
+  width: 1.5px;
+  background: rgba(150,180,255,0.35);
+}
+.etotal-fill {
+  position: absolute;
+  top: 0; height: 100%;
+  border-radius: 5px;
+  transition: width 0.1s, left 0.1s, background 0.2s;
+}
+.etotal-num { font-size: 9px; width: 46px; flex-shrink: 0; text-align: right; font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* 凡例 */
+.legend {
+  display: flex; flex-wrap: wrap; gap: 6px 14px;
+  width: 100%; max-width: 1100px;
+  font-size: 11px;
+}
+.leg-item { display: flex; align-items: center; gap: 4px; color: #7788aa; }
+.leg-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+
+/* コントロール */
+.panel {
+  width: 100%;
+  max-width: 1100px;
+  background: #0f1220;
+  border: 1px solid #1e2844;
+  border-radius: 8px;
+  padding: 11px 14px;
+  font-size: 13px;
+  color: #8899bb;
+}
+.controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.cv-row { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; }
+.cv-label { white-space: nowrap; min-width: 72px; }
+.cv-val { font-weight: 500; color: #ddeeff; min-width: 72px; text-align: right; font-size: 13px; }
+input[type=range] {
+  flex: 1; -webkit-appearance: none;
+  height: 4px; border-radius: 2px;
+  background: #2a3a5a; outline: none; cursor: pointer;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: #4488cc; cursor: pointer;
+}
+.btn-group { display: flex; gap: 8px; align-items: center; }
+.cv-btn {
+  background: transparent;
+  border: 1px solid #2a3a5a; color: #aabbdd;
+  padding: 6px 14px; border-radius: 6px;
+  cursor: pointer; font-size: 13px; white-space: nowrap;
+  transition: background 0.15s;
+}
+.cv-btn:hover:not(:disabled) { background: #1a2440; }
+.cv-btn.primary { border-color: #3a6aaa; color: #88bbff; }
+.cv-btn.primary:hover:not(:disabled) { background: #182840; }
+.cv-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* エネルギー説明フッター */
+.ep-note {
+  font-size: 9.5px;
+  color: #556688;
+  line-height: 1.6;
+  border-top: 1px solid #182030;
+  padding-top: 7px;
+  text-align: left;
+}
+.ep-note b { color: #7799cc; font-weight: 500; }
+</style>
+</head>
+<body>
+<h1>宇宙速度シミュレーター</h1>
+
+<div class="main-layout">
+  <canvas id="cv-canvas" width="820" height="500"></canvas>
+
+  <!-- エネルギーパネル -->
+  <div class="energy-panel" id="energy-panel">
+    <div class="ep-title">ENERGY MONITOR</div>
+    <div class="ep-zero-line">
+      合計 E &lt; 0 → <span>束縛軌道</span><br>
+      合計 E ≥ 0 → <span style="color:#ffaa44">脱出軌道</span>
+    </div>
+    <!-- カードはJSで生成 -->
+    <div id="ep-cards"></div>
+    <div class="ep-note">
+      <b>KE</b> 運動エネルギー ½mv²<br>
+      <b>PE</b> 重力ポテンシャル −GMm/r<br>
+      <b>E</b> &nbsp;合計 = KE + PE<br>
+      バー中央が E=0 の基準線
+    </div>
+  </div>
+</div>
+
+<div class="legend">
+  <div class="leg-item"><div class="leg-dot" style="background:#e05050"></div>4.0 km/s（落下）</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#50d0e0"></div>7.9 km/s（第一宇宙速度）</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#80e080"></div>9.5 km/s（楕円軌道）</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#f0b030"></div>11.2 km/s（第二宇宙速度）</div>
+  <div class="leg-item"><div class="leg-dot" style="background:#e080f0"></div>カスタム</div>
+</div>
+
+<div class="panel controls">
+  <div class="btn-group">
+    <button class="cv-btn primary" id="btn-start">▶ スタート</button>
+    <button class="cv-btn" id="btn-pause" disabled>⏸ 一時停止</button>
+    <button class="cv-btn" id="btn-reset">⏮ 最初に戻る</button>
+  </div>
+  <div class="cv-row">
+    <span class="cv-label">シミュ速度</span>
+    <input type="range" id="sl-speed" min="1" max="100" value="30" step="1">
+    <span class="cv-val" id="out-speed">30</span>
+  </div>
+  <div class="cv-row">
+    <span class="cv-label">カスタム速度</span>
+    <input type="range" id="sl-custom" min="1" max="20" value="6" step="0.1">
+    <span class="cv-val" id="out-custom">6.0 km/s</span>
+  </div>
+</div>
+
+<script>
+(function () {
+  /* ── 定数 ── */
+  const G  = 6.674e-11;
+  const ME = 5.972e24;
+  const RE = 6.371e6;
+  const m  = 1;          // 質量 1 kg で比エネルギー計算
+
+  const canvas = document.getElementById('cv-canvas');
+  const ctx    = canvas.getContext('2d');
+  const CW = 820, CH = 500;
+  canvas.width = CW; canvas.height = CH;
+
+  /* DOM */
+  const slSpeed   = document.getElementById('sl-speed');
+  const slCustom  = document.getElementById('sl-custom');
+  const outSpeed  = document.getElementById('out-speed');
+  const outCustom = document.getElementById('out-custom');
+  const btnStart  = document.getElementById('btn-start');
+  const btnPause  = document.getElementById('btn-pause');
+  const btnReset  = document.getElementById('btn-reset');
+  const epCards   = document.getElementById('ep-cards');
+
+  slSpeed.addEventListener('input',  () => { outSpeed.textContent = slSpeed.value; });
+  slCustom.addEventListener('input', () => {
+    outCustom.textContent = parseFloat(slCustom.value).toFixed(1) + ' km/s';
+    resetSim(); drawStatic();
+  });
+  btnStart.addEventListener('click', startSim);
+  btnPause.addEventListener('click', pauseSim);
+  btnReset.addEventListener('click', () => { resetSim(); drawStatic(); });
+
+  /* ── 軌道設定 ── */
+  const CONFIGS = [
+    { v0: 4000,  color: '#e05050', label: '4.0 km/s', key: 'c0' },
+    { v0: 7900,  color: '#50d0e0', label: '7.9 km/s', key: 'c1' },
+    { v0: 9500,  color: '#80e080', label: '9.5 km/s', key: 'c2' },
+    { v0: 11200, color: '#f0b030', label: '11.2 km/s', key: 'c3' },
+    { v0: null,  color: '#e080f0', label: null,        key: 'c4' },
+  ];
+
+  /* ── 星フィールド ── */
+  const STARS = Array.from({length: 200}, () => ({
+    x: Math.random() * CW, y: Math.random() * CH,
+    r: Math.random() * 1.3 + 0.3, a: Math.random() * 0.7 + 0.2
+  }));
+
+  /* ── 状態 ── */
+  let zoom = 1, camX = 0, camY = 0;
+  let trails = [], bodies = [];
+  let running = false, animId = null, prevTime = null;
+
+  /* ── エネルギーUI DOM ── */
+  let energyEls = []; // [{ke, pe, total, state, fillKe, fillPe, fillE, numKe, numPe, numE}]
+
+  function getCustomV()     { return parseFloat(slCustom.value) * 1000; }
+  function getSpeedFactor() { return parseInt(slSpeed.value); }
+
+  /* ── エネルギー計算（比エネルギー J/kg） ── */
+  function calcEnergy(body) {
+    const v2 = body.vx*body.vx + body.vy*body.vy;
+    const r  = Math.sqrt(body.x*body.x + body.y*body.y);
+    const ke =  0.5 * v2;
+    const pe = -G * ME / r;
+    return { ke, pe, total: ke + pe };
+  }
+
+  /* ── エネルギーUIの初期化 ── */
+  function buildEnergyUI() {
+    epCards.innerHTML = '';
+    energyEls = [];
+
+    const activeConfigs = CONFIGS.map((c, i) => ({ cfg: c, idx: i }))
+      .filter(({ cfg }) => cfg.v0 !== null || true);  // 全部表示
+
+    for (const { cfg, idx } of activeConfigs) {
+      const card = document.createElement('div');
+      card.className = 'orbit-card';
+      card.id = 'ecard-' + cfg.key;
+
+      const lbl = cfg.label || '?? km/s';
+      card.innerHTML = `
+        <div class="orbit-card-header">
+          <div class="orbit-dot" style="background:${cfg.color}"></div>
+          <span class="orbit-name" id="ename-${cfg.key}">${lbl}</span>
+          <span class="orbit-state state-bound" id="estate-${cfg.key}">束縛</span>
+        </div>
+        <div class="energy-bars">
+          <div class="ebar-row">
+            <span class="ebar-label">KE</span>
+            <div class="ebar-track" id="etrack-ke-${cfg.key}">
+              <div class="ebar-fill" id="efill-ke-${cfg.key}" style="background:#4488ff;left:50%;width:0%"></div>
+            </div>
+            <span class="ebar-num" id="enum-ke-${cfg.key}">—</span>
+          </div>
+          <div class="ebar-row">
+            <span class="ebar-label">PE</span>
+            <div class="ebar-track" id="etrack-pe-${cfg.key}">
+              <div class="ebar-fill" id="efill-pe-${cfg.key}" style="background:#cc4444;right:50%;width:0%;left:auto"></div>
+            </div>
+            <span class="ebar-num" id="enum-pe-${cfg.key}">—</span>
+          </div>
+        </div>
+        <div class="etotal-row">
+          <span class="etotal-label">E</span>
+          <div class="etotal-bar-wrap">
+            <div class="etotal-track">
+              <div class="etotal-fill" id="efill-e-${cfg.key}" style="background:#aaaaff;left:50%;width:0%"></div>
+            </div>
+          </div>
+          <span class="etotal-num" id="enum-e-${cfg.key}" style="color:#aaaaff">—</span>
+        </div>`;
+
+      epCards.appendChild(card);
+      energyEls.push({
+        key:     cfg.key,
+        nameEl:  document.getElementById(`ename-${cfg.key}`),
+        stateEl: document.getElementById(`estate-${cfg.key}`),
+        fillKe:  document.getElementById(`efill-ke-${cfg.key}`),
+        fillPe:  document.getElementById(`efill-pe-${cfg.key}`),
+        fillE:   document.getElementById(`efill-e-${cfg.key}`),
+        numKe:   document.getElementById(`enum-ke-${cfg.key}`),
+        numPe:   document.getElementById(`enum-pe-${cfg.key}`),
+        numE:    document.getElementById(`enum-e-${cfg.key}`),
+      });
+    }
+  }
+
+  /* ── エネルギーUI更新 ── */
+  // スケール基準: 初期KE を 100% とする
+  let initKe = 0;
+
+  function updateEnergyUI() {
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
+      const el   = energyEls[i];
+      if (!el) continue;
+
+      // カスタムの名前を更新
+      if (i === 4) {
+        const cv = getCustomV();
+        el.nameEl.textContent = (cv/1000).toFixed(1) + ' km/s';
+      }
+
+      if (!body.alive && !body.escaped) {
+        el.stateEl.textContent = '衝突';
+        el.stateEl.className   = 'orbit-state state-impact';
+        continue;
+      }
+
+      const { ke, pe, total } = calcEnergy(body);
+      const scale = initKe > 0 ? initKe : 1e7;
+
+      // KE バー: 中央から右へ（常に正）
+      const keW = Math.min(ke / scale * 50, 50);
+      el.fillKe.style.left  = '50%';
+      el.fillKe.style.width = keW.toFixed(1) + '%';
+
+      // PE バー: 中央から左へ（常に負）
+      const peW = Math.min(Math.abs(pe) / scale * 50, 50);
+      el.fillPe.style.right = '50%';
+      el.fillPe.style.width = peW.toFixed(1) + '%';
+      el.fillPe.style.left  = 'auto';
+
+      // 合計エネルギーバー: 中央基準、正なら右、負なら左
+      const eNorm = total / scale;   // -1〜+1 程度
+      const eW    = Math.min(Math.abs(eNorm) * 50, 50);
+      if (total >= 0) {
+        el.fillE.style.left       = '50%';
+        el.fillE.style.right      = 'auto';
+        el.fillE.style.width      = eW.toFixed(1) + '%';
+        el.fillE.style.background = '#ffaa44';
+        el.numE.style.color       = '#ffaa44';
+      } else {
+        el.fillE.style.left       = 'auto';
+        el.fillE.style.right      = '50%';
+        el.fillE.style.width      = eW.toFixed(1) + '%';
+        el.fillE.style.background = '#5599ff';
+        el.numE.style.color       = '#5599ff';
+      }
+
+      // 状態バッジ
+      if (!body.alive) {
+        el.stateEl.textContent = '衝突';
+        el.stateEl.className   = 'orbit-state state-impact';
+      } else if (total >= 0) {
+        el.stateEl.textContent = '脱出';
+        el.stateEl.className   = 'orbit-state state-escape';
+      } else {
+        el.stateEl.textContent = '束縛';
+        el.stateEl.className   = 'orbit-state state-bound';
+      }
+
+      // 数値（MJ/kg）
+      el.numKe.textContent = (ke  / 1e6).toFixed(1) + ' MJ';
+      el.numPe.textContent = (pe  / 1e6).toFixed(1) + ' MJ';
+      el.numE.textContent  = (total / 1e6).toFixed(1) + ' MJ';
+    }
+  }
+
+  /* ── シミュ管理 ── */
+  function resetSim() {
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    running = false; prevTime = null;
+
+    const cv = getCustomV();
+    CONFIGS[4].v0    = cv;
+    CONFIGS[4].label = (cv / 1000).toFixed(1) + ' km/s';
+
+    zoom = 6e-5; camX = 0; camY = 0;
+    trails = CONFIGS.map(c => ({ pts: [], color: c.color, label: c.label }));
+    bodies = CONFIGS.map(c => {
+      const r0 = RE + 400e3, ang = -Math.PI / 2;
+      return {
+        x: r0 * Math.cos(ang), y: r0 * Math.sin(ang),
+        vx: c.v0 * Math.cos(ang + Math.PI/2),
+        vy: c.v0 * Math.sin(ang + Math.PI/2),
+        alive: true, escaped: false
+      };
+    });
+
+    // 初期KEを基準スケールに
+    initKe = 0.5 * CONFIGS[3].v0 * CONFIGS[3].v0; // 11.2 km/s のKEを最大とする
+
+    buildEnergyUI();
+    updateEnergyUI();
+    updateButtons();
+  }
+
+  function startSim() {
+    if (running) return;
+    running = true; prevTime = null;
+    updateButtons();
+    animId = requestAnimationFrame(frame);
+  }
+
+  function pauseSim() {
+    if (!running) return;
+    running = false;
+    if (animId) { cancelAnimationFrame(animId); animId = null; }
+    updateButtons();
+  }
+
+  function updateButtons() {
+    btnStart.disabled = running;
+    btnPause.disabled = !running;
+  }
+
+  /* ── 物理演算 ── */
+  function integrate(body, dt) {
+    if (!body.alive) return;
+    const S = 4, dts = dt / S;
+    for (let i = 0; i < S; i++) {
+      const r2 = body.x*body.x + body.y*body.y;
+      const r  = Math.sqrt(r2);
+      if (r < RE * 0.95) { body.alive = false; return; }
+      const a  = -G * ME / r2;
+      body.vx += a * body.x / r * dts;
+      body.vy += a * body.y / r * dts;
+      body.x  += body.vx * dts;
+      body.y  += body.vy * dts;
+      if (r > RE * 150) body.escaped = true;
+    }
+  }
+
+  /* ── 描画ユーティリティ ── */
+  function w2s(wx, wy) { return [CW/2 + (wx - camX)*zoom, CH/2 - (wy - camY)*zoom]; }
+
+  function drawStars() {
+    for (const s of STARS) {
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+      ctx.fillStyle = `rgba(255,255,255,${s.a})`; ctx.fill();
+    }
+  }
+
+  function drawEarth() {
+    const [ex, ey] = w2s(0, 0);
+    const rPx = RE * zoom;
+    const grd = ctx.createRadialGradient(ex-rPx*.3, ey-rPx*.3, rPx*.1, ex, ey, rPx);
+    grd.addColorStop(0,   '#6abde8');
+    grd.addColorStop(0.4, '#3a8fc0');
+    grd.addColorStop(0.7, '#1a5f8a');
+    grd.addColorStop(1,   '#0d3a5c');
+    ctx.beginPath(); ctx.arc(ex, ey, Math.max(rPx, 2), 0, Math.PI*2);
+    ctx.fillStyle = grd; ctx.fill();
+    if (rPx > 3) {
+      ctx.strokeStyle = 'rgba(100,180,255,0.3)';
+      ctx.lineWidth   = Math.max(rPx*.06, 1); ctx.stroke();
+    }
+    const ag = ctx.createRadialGradient(ex, ey, rPx*.95, ex, ey, rPx*1.1);
+    ag.addColorStop(0, 'rgba(80,160,255,.22)'); ag.addColorStop(1, 'rgba(80,160,255,0)');
+    ctx.beginPath(); ctx.arc(ex, ey, rPx*1.1, 0, Math.PI*2);
+    ctx.fillStyle = ag; ctx.fill();
+  }
+
+  function drawTrails() {
+    for (const trail of trails) {
+      if (trail.pts.length < 2) continue;
+      ctx.save();
+      ctx.strokeStyle = trail.color; ctx.lineWidth = 1.5;
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+      ctx.shadowColor = trail.color; ctx.shadowBlur = 3;
+      ctx.beginPath();
+      let first = true;
+      for (const p of trail.pts) {
+        const [sx, sy] = w2s(p[0], p[1]);
+        first ? ctx.moveTo(sx, sy) : ctx.lineTo(sx, sy); first = false;
+      }
+      ctx.stroke(); ctx.restore();
+    }
+  }
+
+  function drawBodies() {
+    for (let i = 0; i < bodies.length; i++) {
+      const trail = trails[i];
+      if (!trail.pts.length) continue;
+      const last = trail.pts[trail.pts.length-1];
+      const [sx, sy] = w2s(last[0], last[1]);
+      ctx.beginPath(); ctx.arc(sx, sy, 3.5, 0, Math.PI*2);
+      ctx.fillStyle = trail.color; ctx.shadowColor = trail.color; ctx.shadowBlur = 7;
+      ctx.fill(); ctx.shadowBlur = 0;
+      if (trail.label && trail.pts.length > 2) {
+        ctx.font = '11px sans-serif'; ctx.fillStyle = trail.color;
+        ctx.globalAlpha = 0.9; ctx.fillText(trail.label, sx+7, sy-5); ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  function drawHUD() {
+    const barKm = 5000, barPx = barKm * 1000 * zoom;
+    if (barPx > 10 && barPx < 300) {
+      ctx.fillStyle = 'rgba(180,200,255,.5)'; ctx.fillRect(14, CH-22, barPx, 2);
+      ctx.font = '10px sans-serif'; ctx.fillStyle = 'rgba(180,200,255,.5)';
+      ctx.fillText(barKm.toLocaleString() + ' km', 14, CH-26);
+    }
+    const cv = getCustomV();
+    let info;
+    if      (cv < 7700)  info = '亜軌道速度 → 落下';
+    else if (cv < 8100)  info = '≈ 第一宇宙速度 → 円軌道';
+    else if (cv < 11000) info = '第一〜第二宇宙速度 → 楕円軌道';
+    else if (cv < 11400) info = '≈ 第二宇宙速度 → 脱出';
+    else                 info = '第二宇宙速度超過 → 双曲線脱出';
+    ctx.font = '11px sans-serif'; ctx.fillStyle = 'rgba(200,170,255,.85)';
+    ctx.fillText('カスタム: ' + info, 12, 20);
+  }
+
+  function computeTargetZoom() {
+    let maxR = RE * 2;
+    for (const t of trails)
+      for (const p of t.pts) {
+        const r = Math.sqrt(p[0]*p[0]+p[1]*p[1]);
+        if (r > maxR) maxR = r;
+      }
+    return (Math.min(CW, CH) * 0.38) / Math.min(maxR, RE * 80);
+  }
+
+  /* ── 初期静止画 ── */
+  function drawStatic() {
+    ctx.fillStyle = '#06080f'; ctx.fillRect(0, 0, CW, CH);
+    drawStars(); drawEarth();
+    const r0 = RE + 400e3;
+    const [sx, sy] = w2s(r0*Math.cos(-Math.PI/2), r0*Math.sin(-Math.PI/2));
+    ctx.beginPath(); ctx.arc(sx, sy, 5, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fill();
+    ctx.font = '14px sans-serif'; ctx.fillStyle = 'rgba(160,190,255,.7)';
+    ctx.textAlign = 'center';
+    ctx.fillText('▶ スタートを押して開始', CW/2, CH-16);
+    ctx.textAlign = 'left';
+  }
+
+  /* ── メインループ ── */
+  function frame(ts) {
+    if (!running) return;
+    animId = requestAnimationFrame(frame);
+    if (prevTime === null) prevTime = ts;
+    const wallDt = Math.min((ts - prevTime) / 1000, 0.05);
+    prevTime = ts;
+    const physDt = wallDt * getSpeedFactor() * 30;
+
+    for (let i = 0; i < bodies.length; i++) {
+      const body = bodies[i];
+      if (!body.alive && !body.escaped) continue;
+      integrate(body, physDt);
+      if (body.alive || body.escaped) {
+        trails[i].pts.push([body.x, body.y]);
+        if (trails[i].pts.length > 2000) trails[i].pts.shift();
+      }
+    }
+
+    zoom += (computeTargetZoom() - zoom) * 0.015;
+
+    ctx.fillStyle = '#06080f'; ctx.fillRect(0, 0, CW, CH);
+    drawStars(); drawTrails(); drawEarth(); drawBodies(); drawHUD();
+
+    updateEnergyUI();
+  }
+
+  /* ── 起動 ── */
+  resetSim();
+  drawStatic();
+})();
+</script>
+</body>
+</html>
