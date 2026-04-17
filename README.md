@@ -120,4 +120,4 @@ MIT License — 教育・研究・改変・再配布、すべて自由です。
 
 **けんしょう**  
 - Niconico: [窮理学](https://www.nicovideo.jp/) — 物理・宇宙解説シリーズ  
-- GitHub: [@YOUR_USERNAME](https://github.com/YOUR_USERNAME)
+- GitHub: @kensyo-lab
